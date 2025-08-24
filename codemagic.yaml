@@ -5,23 +5,32 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
+      cocoapods: default
     scripts:
-      - name: Set up code signing
+      - name: Set up provisioning profiles
         script: |
-          # Set up code signing for ad-hoc distribution
+          # Initialize keychain for code signing
           keychain initialize
       - name: Get Flutter packages
         script: |
           flutter packages get
-      - name: Build iOS for device
+      - name: Build iOS for physical device
         script: |
-          # Ensure we're building for device, not simulator
-          flutter build ios --release --no-codesign
-          # Verify the build is for device
-          lipo -info build/ios/iphoneos/Runner.app/Runner || echo "Binary info not available"
+          # Clean any previous builds
+          flutter clean
+          flutter packages get
+          # Explicitly build for iOS device (not simulator)
+          flutter build ios --release --no-codesign --target-platform ios
+          # Create a properly structured IPA
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r ../../../Runner-device.ipa Payload/
+          # Verify architecture (should show arm64 for device)
+          lipo -info Runner.app/Runner || echo "Could not read binary info"
     artifacts:
       - build/ios/iphoneos/Runner.app
-      - build/ios/iphoneos/**/*.ipa
+      - Runner-device.ipa
     publishing:
       email:
         recipients:
